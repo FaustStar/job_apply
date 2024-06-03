@@ -1,6 +1,8 @@
 #include "stdio.h"
 #define ROWS 4
 #define COLUMNS 5
+#define READ_MODE 0
+#define WRITE_MODE 1
 
 void print(int value, int position, int columns);
 
@@ -11,15 +13,16 @@ int main(void) {
                             {0x0C, 0x05, 0x04, 0x00, 0x7C}
     };
     for (int i = 0; i < ROWS; i++) {
+        int mode = (arr[i][1] == 1 || arr[i][1] == 3) ? READ_MODE : WRITE_MODE;
         for (int j = 0; j < COLUMNS; j++) {
-            print(arr[i][j], j, COLUMNS);
+            print(arr[i][j], j, mode);
         }
         printf("\n");
     }
     return 0;
 }
 
-void print(int value, int position, int columns) {
+void print(int value, int position, int mode) {
     switch (position) {
         case 0:
             printf("Адрес устройства: %d\n", value);
@@ -38,13 +41,14 @@ void print(int value, int position, int columns) {
             printf("Адрес ячейки памяти: %d\n", value);
             break;
         case 3:
-            if (columns > 4) //columns > position + 1
+            if (mode == WRITE_MODE)
                 printf("Записываемое значение: %d\n", value);
             else
                 printf("Контрольная сумма для проверки целостности данных: %d\n", value);
             break;
-        default:
-            printf("Контрольная сумма для проверки целостности данных: %d\n", value);
+        case 4:
+            if (mode == WRITE_MODE)
+                printf("Контрольная сумма для проверки целостности данных: %d\n", value);
             break;
     }
 }
