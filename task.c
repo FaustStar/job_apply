@@ -5,15 +5,17 @@
 #define READ_MODE 0
 #define WRITE_MODE 1
 
+typedef unsigned char my_type;
+
 typedef struct matrix {
     int rows;
     int columns;
-    int **matrix;
+    my_type **matrix;
 } matrix;
 
 void process_input(matrix *data);
 int check_input(FILE *file, char *str, int *ch);
-void print(int value, int position, int columns);
+void print(my_type value, int position, int columns);
 void free_memory(matrix *data);
 
 int main(void) {
@@ -40,9 +42,9 @@ void process_input(matrix *data) {
     if (file != NULL) {
         data->rows = 1;
         data->columns = COLUMNS;
-        data->matrix = calloc(data->rows, sizeof(int *));
+        data->matrix = calloc(data->rows, sizeof(my_type *));
         for (int i = 0; i < data->rows; i++) {
-            data->matrix[i] = calloc(data->columns, sizeof(int));
+            data->matrix[i] = calloc(data->columns, sizeof(my_type));
         }
         char str[2];
         int ch = 0;
@@ -55,9 +57,9 @@ void process_input(matrix *data) {
                 if (ch == '\n') {
                     j = data->columns;
                     (data->rows)++;
-                    data->matrix = realloc(data->matrix, data->rows * sizeof(int *));
+                    data->matrix = realloc(data->matrix, data->rows * sizeof(my_type *));
                     for (int k = data->rows - 1; k < data->rows; k++) {
-                        data->matrix[k] = calloc(data->columns, sizeof(int));
+                        data->matrix[k] = calloc(data->columns, sizeof(my_type));
                     }
                 }
             }
@@ -79,7 +81,7 @@ int check_input(FILE *file, char *str, int *ch) {
     return 0;
 }
 
-void print(int value, int position, int mode) {
+void print(my_type value, int position, int mode) {
     switch (position) {
         case 0:
             printf("Адрес устройства: %d\n", value);
