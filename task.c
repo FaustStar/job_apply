@@ -4,6 +4,8 @@
 #define COLUMNS 6
 #define READ_MODE 0
 #define WRITE_MODE 1
+#define VALID_INPUT 0
+#define NO_VALID_INPUT 1
 
 typedef unsigned char my_type;
 
@@ -30,10 +32,14 @@ int main(void) {
     status info;
     process_input(&data);
     for (int i = 0; i < data.rows; i++) {
-        info.mode = (data.matrix[i][1] == 1 || data.matrix[i][1] == 3) ? READ_MODE : WRITE_MODE;
-        info.crc8 = check_crc8(data.matrix[i], info.mode);
-        for (int j = 0; j < data.columns; j++) {
-            print(data.matrix[i][j], j, info);
+        if (data.matrix[i][data.columns - 1] == VALID_INPUT) {
+            info.mode = (data.matrix[i][1] == 1 || data.matrix[i][1] == 3) ? READ_MODE : WRITE_MODE;
+            info.crc8 = check_crc8(data.matrix[i], info.mode);
+            for (int j = 0; j < data.columns; j++) {
+                print(data.matrix[i][j], j, info);
+            }
+        } else {
+            printf("Error: not correct input!\n");
         }
         printf("\n");
     }
@@ -53,10 +59,12 @@ void process_input(matrix *data) {
         char str[2];
         int ch = 0;
         for (int i = 0; i < data->rows; i++) {
-            for (int j = 0; j < data->columns - 1; j++) {
+            for (int j = 0; j < data->columns - 1 && ch != EOF; j++) {
                 if (check_input(file, str, &ch) == 0) {
                     int n = strtol(str, NULL, 16);
                     data->matrix[i][j] = n;
+                } else {
+                    data->matrix[i][data->columns - 1] = NO_VALID_INPUT;
                 }
                 if (ch == '\n') {
                     j = data->columns;
@@ -70,7 +78,7 @@ void process_input(matrix *data) {
         }
         fclose(file);
     } else {
-        printf("The file doesn't exist!\n");
+        printf("Error: the file doesn't exist!\n");
     }
 }
 
@@ -80,6 +88,7 @@ int check_input(FILE *file, char *str, int *ch) {
     }
     *ch = fgetc(file);
     if (*ch != ' ' && *ch != '\n' && *ch != EOF) {
+        //while((*ch = fgetc(file)) != '\n' && *ch != EOF);
         return 1;
     }
     return 0;
