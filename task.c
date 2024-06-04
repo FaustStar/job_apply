@@ -4,8 +4,15 @@
 #define COLUMNS 6
 #define READ_MODE 0
 #define WRITE_MODE 1
+
 #define VALID_INPUT 0
-#define NO_VALID_INPUT 1
+#define NOT_VALID_INPUT 1
+#define NOT_VALID_OPERATION 2
+#define NOT_VALID_FILE 3
+#define COUNT_ERROR_R 4
+#define COUNT_ERROR_W 5
+#define COUNT_ERROR_MIN 6
+#define COUNT_ERROR_MAX 7
 
 typedef unsigned char my_type;
 
@@ -20,17 +27,22 @@ typedef struct status {
     my_type crc8;
 } status;
 
-void process_input(matrix *data);
-int check_input(FILE *file, char *str, int *ch);
+void input(matrix *data);
+void process_input(matrix *data, int i, int *j, FILE *file, char *str, int *ch, int *count);
+int check_input(FILE *file, char *str, int *ch, int *count);
+void check_error(matrix *data, int i, int count);
 my_type check_crc8(my_type *matrix, int len);
 void print(my_type value, int position, status info);
 void print_crc8_status(my_type value, my_type crc8);
+void print_err(my_type error);
+void allocate_memory(matrix *data);
+void reallocate_memory(matrix *data);
 void free_memory(matrix *data);
 
 int main(void) {
     matrix data;
     status info;
-    process_input(&data);
+    input(&data);
     for (int i = 0; i < data.rows; i++) {
         if (data.matrix[i][data.columns - 1] == VALID_INPUT) {
             info.mode = (data.matrix[i][1] == 1 || data.matrix[i][1] == 3) ? READ_MODE : WRITE_MODE;
@@ -39,7 +51,7 @@ int main(void) {
                 print(data.matrix[i][j], j, info);
             }
         } else {
-            printf("Error: not correct input!\n");
+            print_err(data.matrix[i][data.columns - 1]);
         }
         printf("\n");
     }
@@ -47,51 +59,66 @@ int main(void) {
     return 0;
 }
 
-void process_input(matrix *data) {
+void input(matrix *data) {
     FILE *file = fopen("input00.txt", "r");
     if (file != NULL) {
-        data->rows = ROWS;
-        data->columns = COLUMNS;
-        data->matrix = calloc(data->rows, sizeof(my_type *));
-        for (int i = 0; i < data->rows; i++) {
-            data->matrix[i] = calloc(data->columns, sizeof(my_type));
-        }
+        allocate_memory(data);
         char str[2];
         int ch = 0;
         for (int i = 0; i < data->rows; i++) {
+            int count = 0;
             for (int j = 0; j < data->columns - 1 && ch != EOF; j++) {
-                if (check_input(file, str, &ch) == 0) {
-                    int n = strtol(str, NULL, 16);
-                    data->matrix[i][j] = n;
-                } else {
-                    data->matrix[i][data->columns - 1] = NO_VALID_INPUT;
-                }
-                if (ch == '\n') {
-                    j = data->columns;
-                    (data->rows)++;
-                    data->matrix = realloc(data->matrix, data->rows * sizeof(my_type *));
-                    for (int k = data->rows - 1; k < data->rows; k++) {
-                        data->matrix[k] = calloc(data->columns, sizeof(my_type));
-                    }
-                }
+                process_input(data, i, &j, file, str, &ch, &count);
             }
+            check_error(data, i, count);
         }
         fclose(file);
     } else {
-        printf("Error: the file doesn't exist!\n");
+        print_err(NOT_VALID_FILE);
     }
 }
 
-int check_input(FILE *file, char *str, int *ch) {
+void process_input(matrix *data, int i, int *j, FILE *file, char *str, int *ch, int *count) {
+    if (check_input(file, str, ch, count) == 0) {
+        int n = strtol(str, NULL, 16);
+        data->matrix[i][*j] = n;
+    } else {
+        data->matrix[i][data->columns - 1] = NOT_VALID_INPUT;
+    }
+    if (*count == 5 && *ch != '\n' && *ch != EOF) {
+        data->matrix[i][data->columns - 1] = COUNT_ERROR_MAX;
+        while((*ch = fgetc(file)) != '\n' && *ch != EOF);
+    }
+    if (*ch == '\n') {
+        *j = data->columns;
+        reallocate_memory(data);
+    }
+}
+
+int check_input(FILE *file, char *str, int *ch, int *count) {
+    (*count)++;
     if (fscanf(file, "%2s", str) != 1) {
         return 1;
     }
     *ch = fgetc(file);
     if (*ch != ' ' && *ch != '\n' && *ch != EOF) {
-        //while((*ch = fgetc(file)) != '\n' && *ch != EOF);
         return 1;
     }
     return 0;
+}
+
+void check_error(matrix *data, int i, int count) {
+    if (data->matrix[i][data->columns - 1] != NOT_VALID_INPUT) {
+        if (count <= 1) {
+            data->matrix[i][data->columns - 1] = COUNT_ERROR_MIN;
+        } else if (data->matrix[i][1] != 1 && data->matrix[i][1] != 3 && data->matrix[i][1] != 5 && data->matrix[i][1] != 6) {
+            data->matrix[i][data->columns - 1] = NOT_VALID_OPERATION;
+        } else if ((data->matrix[i][1] == 1 || data->matrix[i][1] == 3) && count != 4) {
+            data->matrix[i][data->columns - 1] = COUNT_ERROR_R;
+        } else if ((data->matrix[i][1] == 5 || data->matrix[i][1] == 6) && count != 5) {
+            data->matrix[i][data->columns - 1] = COUNT_ERROR_W;
+        }
+    }
 }
 
 my_type check_crc8(my_type *matrix, int mode) {
@@ -142,6 +169,49 @@ void print_crc8_status(my_type value, my_type crc8) {
         printf("(расчет произведен верно)\n");
     else
         printf("(расчет произведен не верно, сумма должна быть %d)\n", crc8);
+}
+
+void print_err(my_type error) {
+    switch (error) {
+        case NOT_VALID_INPUT:
+            printf("Ошибка: ввод не верный!\n");
+            break;
+        case NOT_VALID_OPERATION:
+            printf("Ошибка: такого кода функции не существует!\n");
+            break;
+        case COUNT_ERROR_R:
+            printf("Ошибка: для чтения в вводе должно быть 4 байта!\n");
+            break;
+        case COUNT_ERROR_W:
+            printf("Ошибка: для записи в вводе должно быть 5 байтов!\n");
+            break;
+        case COUNT_ERROR_MIN:
+            printf("Ошибка: слишком мало данных в вводе!\n");
+            break;
+        case COUNT_ERROR_MAX:
+            printf("Ошибка: слишком много данных в вводе!\n");
+            break;
+        case NOT_VALID_FILE:
+            printf("Ошибка: такого файла не существует!\n");
+            break;
+    }
+}
+
+void allocate_memory(matrix *data) {
+    data->rows = ROWS;
+    data->columns = COLUMNS;
+    data->matrix = calloc(data->rows, sizeof(my_type *));
+    for (int i = 0; i < data->rows; i++) {
+        data->matrix[i] = calloc(data->columns, sizeof(my_type));
+    }
+}
+
+void reallocate_memory(matrix *data) {
+    (data->rows)++;
+    data->matrix = realloc(data->matrix, data->rows * sizeof(my_type *));
+    for (int i = data->rows - 1; i < data->rows; i++) {
+        data->matrix[i] = calloc(data->columns, sizeof(my_type));
+    }
 }
 
 void free_memory(matrix *data) {
