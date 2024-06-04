@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-#define ROWS 4
+#define ROWS 1
 #define COLUMNS 6
 #define READ_MODE 0
 #define WRITE_MODE 1
@@ -13,23 +13,27 @@ typedef struct matrix {
     my_type **matrix;
 } matrix;
 
+typedef struct status {
+    int mode;
+    my_type crc8;
+} status;
+
 void process_input(matrix *data);
 int check_input(FILE *file, char *str, int *ch);
-void print(my_type value, int position, int columns);
+my_type check_crc8(my_type *matrix, int len);
+void print(my_type value, int position, status info);
+void print_crc8_status(my_type value, my_type crc8);
 void free_memory(matrix *data);
 
 int main(void) {
-    /*int arr[ROWS][COLUMNS] = {{0x01, 0x03, 0x01, 0x53},
-                            {0x3A, 0x01, 0x10, 0x03},
-                            {0xAB, 0x06, 0x4C, 0x13, 0xA8},
-                            {0x0C, 0x05, 0x04, 0x00, 0x7C}
-    };*/
     matrix data;
+    status info;
     process_input(&data);
     for (int i = 0; i < data.rows; i++) {
-        int mode = (data.matrix[i][1] == 1 || data.matrix[i][1] == 3) ? READ_MODE : WRITE_MODE;
+        info.mode = (data.matrix[i][1] == 1 || data.matrix[i][1] == 3) ? READ_MODE : WRITE_MODE;
+        info.crc8 = check_crc8(data.matrix[i], info.mode);
         for (int j = 0; j < data.columns; j++) {
-            print(data.matrix[i][j], j, mode);
+            print(data.matrix[i][j], j, info);
         }
         printf("\n");
     }
@@ -40,7 +44,7 @@ int main(void) {
 void process_input(matrix *data) {
     FILE *file = fopen("input00.txt", "r");
     if (file != NULL) {
-        data->rows = 1;
+        data->rows = ROWS;
         data->columns = COLUMNS;
         data->matrix = calloc(data->rows, sizeof(my_type *));
         for (int i = 0; i < data->rows; i++) {
@@ -81,7 +85,18 @@ int check_input(FILE *file, char *str, int *ch) {
     return 0;
 }
 
-void print(my_type value, int position, int mode) {
+my_type check_crc8(my_type *matrix, int mode) {
+    my_type crc8 = 0x00;
+    int len = (mode == READ_MODE) ? 3 : 4;
+    while (len--) {
+        crc8 ^= *matrix++; //crc8 ^= matrix[i++]
+        for (int i = 0; i < 8; i++)
+            crc8 = crc8 & 0x80 ? (crc8 << 1) ^ 0x07 : crc8 << 1;
+    }
+    return crc8;
+}
+
+void print(my_type value, int position, status info) {
     switch (position) {
         case 0:
             printf("Адрес устройства: %d\n", value);
@@ -100,16 +115,24 @@ void print(my_type value, int position, int mode) {
             printf("Адрес ячейки памяти: %d\n", value);
             break;
         case 3:
-            if (mode == WRITE_MODE)
+            if (info.mode == WRITE_MODE)
                 printf("Записываемое значение: %d\n", value);
             else
-                printf("Контрольная сумма для проверки целостности данных: %d\n", value);
+                print_crc8_status(value, info.crc8);
             break;
         case 4:
-            if (mode == WRITE_MODE)
-                printf("Контрольная сумма для проверки целостности данных: %d\n", value);
+            if (info.mode == WRITE_MODE)
+                print_crc8_status(value, info.crc8);
             break;
     }
+}
+
+void print_crc8_status(my_type value, my_type crc8) {
+    printf("Контрольная сумма для проверки целостности данных: %d ", value);
+    if (value == crc8)
+        printf("(расчет произведен верно)\n");
+    else
+        printf("(расчет произведен не верно, сумма должна быть %d)\n", crc8);
 }
 
 void free_memory(matrix *data) {
