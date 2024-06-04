@@ -27,7 +27,7 @@ typedef struct status {
     my_type crc8;
 } status;
 
-void input(matrix *data);
+int input(matrix *data);
 void process_input(matrix *data, int i, int *j, FILE *file, char *str, int *ch, int *count);
 int check_input(FILE *file, char *str, int *ch, int *count);
 void check_error(matrix *data, int i, int count);
@@ -42,24 +42,28 @@ void free_memory(matrix *data);
 int main(void) {
     matrix data;
     status info;
-    input(&data);
-    for (int i = 0; i < data.rows; i++) {
-        if (data.matrix[i][data.columns - 1] == VALID_INPUT) {
-            info.mode = (data.matrix[i][1] == 1 || data.matrix[i][1] == 3) ? READ_MODE : WRITE_MODE;
-            info.crc8 = check_crc8(data.matrix[i], info.mode);
-            for (int j = 0; j < data.columns; j++) {
-                print(data.matrix[i][j], j, info);
+    if (input(&data) == VALID_INPUT) {
+        for (int i = 0; i < data.rows; i++) {
+            if (data.matrix[i][data.columns - 1] == VALID_INPUT) {
+                info.mode = (data.matrix[i][1] == 1 || data.matrix[i][1] == 3) ? READ_MODE : WRITE_MODE;
+                info.crc8 = check_crc8(data.matrix[i], info.mode);
+                for (int j = 0; j < data.columns; j++) {
+                    print(data.matrix[i][j], j, info);
+                }
+            } else {
+                print_err(data.matrix[i][data.columns - 1]);
             }
-        } else {
-            print_err(data.matrix[i][data.columns - 1]);
+            printf("\n");
         }
-        printf("\n");
+        free_memory(&data);
+    } else {
+        print_err(NOT_VALID_FILE);
     }
-    free_memory(&data);
     return 0;
 }
 
-void input(matrix *data) {
+int input(matrix *data) {
+    int error = VALID_INPUT;
     FILE *file = fopen("input00.txt", "r");
     if (file != NULL) {
         allocate_memory(data);
@@ -74,8 +78,9 @@ void input(matrix *data) {
         }
         fclose(file);
     } else {
-        print_err(NOT_VALID_FILE);
+        error = NOT_VALID_FILE;
     }
+    return error;
 }
 
 void process_input(matrix *data, int i, int *j, FILE *file, char *str, int *ch, int *count) {
