@@ -28,7 +28,7 @@ int input(matrix *data) {
     FILE *file = fopen("input00.txt", "r");
     if (file != NULL) {
         allocate_memory(data);
-        char str[2];
+        char str[3];
         int ch = 0;
         for (int i = 0; i < data->rows; i++) {
             int count = 0;
